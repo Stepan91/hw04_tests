@@ -1,30 +1,19 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}
-
-    {% if request.user.id != post.author_id %}
-        Добавить запись
-    {% endif %}
-    {% if request.user.id == post.author_id %}
-        Редактировать запись
-    {% endif %}
-
+    {% if edit_flag %} Редактировать запись {% else %} Добавить запись {% endif %}
 {% endblock %}
 
 {% block header %}
-
-    {% if request.user.id != post.author_id %}
-        Добавить запись
-    {% endif %}
-    {% if request.user.id == post.author_id %}
-        Редактировать запись
-    {% endif %}
-
+    {% if edit_flag %} <div> Редактировать запись </div> {% else %} <div> Добавить запись </div>{% endif %}
 {% endblock %}
 
 {% block content %}
-
-    <form method="post" action="{% url 'new_post' %}">
-    {% csrf_token %}
+{% if edit_flag %}<form method="post">
+    {% else %}<form method="post" action="{% url 'new_post' %}">
+{% endif %}
+    
+        {% csrf_token %}
 
     {% for error in form.errors %}
         <div class="alert alert-danger" role="alert">
@@ -46,13 +35,9 @@
 
         <div class="col-md-6 offset-md-4">              
             <button type="submit" class="btn btn-primary">
-                {% if request.user.id != post.author_id %}
-                    Добавить
-                {% endif %}
-                
-                {% if request.user.id == post.author_id %}
-                    Сохранить
-                {% endif %}
+
+                {% if edit_flag %} <div> Сохранить </div> {% else %} <div> Добавить </div>{% endif %}
+
             </button>
         </div>
 
