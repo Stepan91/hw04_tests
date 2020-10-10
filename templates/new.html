@@ -9,7 +9,7 @@
 {% endblock %}
 
 {% block content %}
-{% if edit_flag %}<form method="post">
+{% if edit_flag %}<form method="post" action="{% url 'post_edit' % post.author.username, post.post_id}>
     {% else %}<form method="post" action="{% url 'new_post' %}">
 {% endif %}
     
@@ -36,7 +36,7 @@
         <div class="col-md-6 offset-md-4">              
             <button type="submit" class="btn btn-primary">
 
-                {% if edit_flag %} <div> Сохранить </div> {% else %} <div> Добавить </div>{% endif %}
+                <div>{% if edit_flag %} Сохранить {% else %} Добавить {% endif %}</div>
 
             </button>
         </div>

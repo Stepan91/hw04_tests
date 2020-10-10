@@ -7,17 +7,10 @@
     <div class="row">
         <div class="col-md-3 mb-3 mt-1">
             <div class="card">
-                <div class="card-body">
-                    {% include "author.html" %}
-                        <li class="list-group-item">
-                            <div class="h6 text-muted">
-                                Записей: {{ paginator.count }}
-                            </div>
-                        </li>
-                    </ul>
-                </div>
+                {% include "author.html" %}
             </div>
-
+        </div>
+<!-- Здесь не получилось. Никак. Сокурсники не в курсе. Есть подсазки? -->
             <div class="col-md-9">                
                 <!-- Начало блока с отдельным постом -->
                 {% for post in page %}

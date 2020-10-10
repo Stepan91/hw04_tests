@@ -1,6 +1,7 @@
 from django.test import TestCase
 from django.test import Client
 from .models import User, Post, Group
+from .forms import PostForm
 from . import views
 from django.urls import reverse
 
@@ -11,9 +12,9 @@ class ScriptsTest(TestCase):
         'LOGIN': reverse('login'),
         'NEW_POST': reverse('new_post'),
         }
-    
+
+
     def setUp(self):
-        self.client = Client()
         self.user = User.objects.create_user(
                         first_name = 'sarah',
                         last_name = 'connor',
@@ -21,70 +22,108 @@ class ScriptsTest(TestCase):
                         email='connor.s@skynet.com', 
                         password='12345'
                         )
-        self.group = Group.objects.create(title='test_group', slug='test')
-        self.urls['REDIRECT'] = (f'{self.urls["LOGIN"]}?next='
-                                 f'{self.urls["NEW_POST"]}')
-        self.urls['PROFILE'] = reverse(
-                                   'profile', 
-                                   kwargs={'username': 'sarah77'}
+        self.group = Group.objects.create(title='original_group', slug='original')
+        self.not_login_user = Client()
+        self.login_user = Client()
+        self.login_user.force_login(self.user)
+    
+
+    def check_method(self, function, search, kwargs = None):
+        self.response_url = self.login_user.get(
+                                reverse(
+                                function,
+                                kwargs=kwargs    
                                 )
+                            )
+        self.assertContains(self.response_url, search)
 
 
-    # redirect_URL = reverse('profile', kwargs={'username': 'sarah77'})
- 
+    def check_method_NOT(self, function, search, kwargs = None):
+        self.response_url = self.login_user.get(
+                                reverse(
+                                function,
+                                kwargs=kwargs    
+                                )
+                            )
+        self.assertNotContains(self.response_url, search)
+
 
     def test_profile(self):
-        response = self.client.get('/sarah77/')
+        response = self.login_user.get(
+                                reverse(
+                                    'profile', 
+                                    kwargs = {'username': self.user.username}
+                                    )
+                                )
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(response.context['author'], User)
         self.assertEqual(response.context['author'].username, self.user.username)
     
 
     def test_post_autorized(self):
-        self.client.force_login(self.user)
-        response = self.client.get(self.urls['NEW_POST'])
+        response = self.login_user.post(self.urls['NEW_POST'])
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.user.username)
+        self.assertEqual(response.context['year'], 2020)
+        
+        self.post = Post.objects.create(text='GOGOGOGOGO', author=self.user)
+        response = self.login_user.get(reverse(
+                                   'profile', 
+                                   kwargs={'username': self.user.username}
+                                   )
+                                )
+        self.assertEqual(len(response.context['paginator'].object_list), 1)
+        self.assertContains(response, self.post.text)
+        self.assertEqual(response.context['author'].username, self.user.username)
 
 
     def test_post_NotAutorized(self):
-        response = self.client.get('/new/')
-        self.assertRedirects(response, self.urls['REDIRECT'])
+        response = self.not_login_user.get('/new/')
+        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(response, (
+                            f'{self.urls["LOGIN"]}?next='
+                            f'{self.urls["NEW_POST"]}'
+                            )
+                        )
 
 
     def test_post_on_pages(self):
-        self.client.force_login(self.user)
         self.post = Post.objects.create(text='GOGOGOGOGO', author=self.user)
-        
-        response = self.client.get('/')
-        self.assertContains(response, self.post.text, status_code=200) 
+        self.check_method('index', self.post.text)
+        self.check_method('post', self.post.text, {'username': self.user.username, 'post_id': self.post.id})
+        self.check_method('profile', self.post.text, {'username': self.user.username})
 
-        response = self.client.post(
-                       reverse(
-                           'post', 
-                           kwargs={
-                               'username': 'sarah77', 'post_id': self.post.id
-                            }
-                        )
-                    )
-        self.assertContains(response, self.post.text, status_code=200)
-    
-        response = self.client.post(self.urls['PROFILE'])
-        self.assertContains(response, self.post.text, status_code=200)
     
     def test_edit_post(self):
-        self.client.force_login(self.user)
         self.post = Post.objects.create(text='GOGOGOGOGO', author=self.user)
+        self.group_new = Group.objects.create(title='test_group_after_edit', slug='test_edit')
         new_data = {
-            'text': 'new_text_for_post',
-            'group': self.group.id
+            'text': 'new_text_after_edit',
+            'group': self.group_new.id,
             }
-        response = self.client.post(
-                        reverse(
-                        'post_edit', 
-                        kwargs={'username': self.user.username, 'post_id': self.post.id}
-                        ),
-                        new_data,
-                        follow=True
-                    )
+        response = self.login_user.post(
+                                reverse(
+                                'post_edit', 
+                                kwargs={'username': self.user.username, 'post_id': self.post.id}
+                                ),
+                            new_data,
+                            follow=True
+                            )
         self.assertContains(response, new_data['text'], status_code=200)
-        self.assertTrue(self.test_post_on_pages)
+        self.assertContains(response, new_data['group'], status_code=200)
+
+        self.check_method_NOT('group_posts', new_data['text'], {'slug': 'original'})
+
+        self.check_method_NOT('group_posts', self.post.text, {'slug': 'test_edit'})
+        self.check_method_NOT('group_posts', self.group, {'slug': 'test_edit'})
+        self.check_method('group_posts', new_data["text"], {'slug': 'test_edit'})
+        self.check_method('group_posts', new_data["group"], {'slug': 'test_edit'})
+
+        self.check_method('profile', new_data["text"], {'username': self.user.username})
+        self.check_method('profile', new_data["group"], {'username': self.user.username})
+
+        self.check_method('post', new_data["text"], {'username': self.user.username, 'post_id': self.post.id})
+        self.check_method('post', new_data["group"], {'username': self.user.username, 'post_id': self.post.id})
+
+        self.check_method('index', new_data["text"])
+        self.check_method('index', new_data["group"])        

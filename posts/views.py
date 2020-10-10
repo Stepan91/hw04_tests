@@ -57,28 +57,24 @@ def profile(request, username):
 
 
 def post_view(request, username, post_id):
-    user = get_object_or_404(User, username=username)
-    post = get_object_or_404(Post, id=post_id)
+    post = get_object_or_404(Post, author=User.objects.get(username=username), id=post_id)
     return render(
         request,
         'post.html',
-        { 'post': post, 'author': user }
+        { 'post': post, 'author': post.author }
         )
 
 
 def post_edit(request, username, post_id):
-    # достать пользователя из post (строка 79) смог только 
-    # после объявления переменной post.
-    # Без переменной user не получилось обойтись.
-    user = get_object_or_404(User, username=username)
-    post = get_object_or_404(Post, author=user, id=post_id)
-    edit_flag = True
+    post = get_object_or_404(Post, author=User.objects.get(username=username), id=post_id)
     if request.user != post.author:
         return redirect('post', username=post.author, post_id=post_id)
     form = PostForm(request.POST or None, instance=post)
     if form.is_valid():
         post = form.save()
         return redirect('post', username=request.user.username, post_id=post_id)
+    edit_flag = True
+    group = get_object_or_404(Group)
     return render(
         request, 
         'new.html', 

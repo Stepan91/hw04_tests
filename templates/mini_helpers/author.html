@@ -1,6 +1,7 @@
-<div class="h2">
-    {{ author.first_name }} {{ author.last_name }}
-</div>
+<div class="card-body">
+    <div class="h2">
+        {{ author.first_name }} {{ author.last_name }}
+    </div>
     <div class="h3 text-muted">
         @ {{ author.username }}
     </div>
@@ -12,3 +13,9 @@
         Подписан: XXX
         </div>
     </li>
+    <li class="list-group-item">
+        <div class="h6 text-muted">
+            Записей: {{ author.posts.count }}
+        </div>
+    </li>
+</ul>
