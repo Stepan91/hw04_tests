@@ -1,9 +1,9 @@
 <div class="card-body">
     <div class="h2">
-        {{ author.first_name }} {{ author.last_name }}
+        {{ first_name }} {{ last_name }}
     </div>
     <div class="h3 text-muted">
-        @ {{ author.username }}
+        @ {{ username }}
     </div>
 </div>
 <ul class="list-group list-group-flush">
@@ -15,7 +15,7 @@
     </li>
     <li class="list-group-item">
         <div class="h6 text-muted">
-            Записей: {{ author.posts.count }}
+            Записей: {{ count }}
         </div>
     </li>
 </ul>

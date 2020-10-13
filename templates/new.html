@@ -5,11 +5,11 @@
 {% endblock %}
 
 {% block header %}
-    {% if edit_flag %} <div> Редактировать запись </div> {% else %} <div> Добавить запись </div>{% endif %}
+<div>{% if edit_flag %} Редактировать запись {% else %} Добавить запись {% endif %}</div>
 {% endblock %}
 
 {% block content %}
-{% if edit_flag %}<form method="post" action="{% url 'post_edit' % post.author.username, post.post_id}>
+{% if edit_flag %}<form method="post" action="{% url 'post_edit' post.author.username post.id %}">
     {% else %}<form method="post" action="{% url 'new_post' %}">
 {% endif %}
     

@@ -57,7 +57,7 @@ def profile(request, username):
 
 
 def post_view(request, username, post_id):
-    post = get_object_or_404(Post, author=User.objects.get(username=username), id=post_id)
+    post = get_object_or_404(Post, author__username=username, id=post_id)
     return render(
         request,
         'post.html',
@@ -66,7 +66,7 @@ def post_view(request, username, post_id):
 
 
 def post_edit(request, username, post_id):
-    post = get_object_or_404(Post, author=User.objects.get(username=username), id=post_id)
+    post = get_object_or_404(Post, author__username=username, id=post_id)
     if request.user != post.author:
         return redirect('post', username=post.author, post_id=post_id)
     form = PostForm(request.POST or None, instance=post)
@@ -74,7 +74,6 @@ def post_edit(request, username, post_id):
         post = form.save()
         return redirect('post', username=request.user.username, post_id=post_id)
     edit_flag = True
-    group = get_object_or_404(Group)
     return render(
         request, 
         'new.html', 

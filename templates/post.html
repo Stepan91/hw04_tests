@@ -6,7 +6,7 @@
     <div class="row">
             <div class="col-md-3 mb-3 mt-1">
                 <div class="card">
-                {% include "author.html" %}
+                {% include "author.html" with first_name=author.first_name last_name=author.last_name username=author.username count=author.posts.count %}
                 </div>
             </div>
 
