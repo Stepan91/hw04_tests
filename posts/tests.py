@@ -50,16 +50,7 @@ class ScriptsTest(TestCase):
             'INDEX': reverse('index'),
             }
 
-
-    def check_method(self, url, search):
-        self.response = self.login_user.get(url)
-        self.assertContains(self.response, search)
-
-
-    def check_method_NOT(self, url, search):
-        self.response = self.login_user.get(url)
-        self.assertNotContains(self.response, search)
-    
+  
     def check(self, url, wonder_attr, search):
         self.response = self.login_user.get(url)
         self.assertEqual(str(self.response.context[wonder_attr]), search)
@@ -73,15 +64,20 @@ class ScriptsTest(TestCase):
     
 
     def test_post_autorized(self):
-        response = self.login_user.post(reverse('new_post'))
+        response = self.login_user.post(
+                                   reverse('new_post'),
+                                   {'text': 'test_text', 'group': self.group.id},
+                                   follow=True
+                                   )
+        
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.user.username)
-        self.assertEqual(response.context['year'], 2020)
-        
-        response = self.login_user.get(self.current_urls['PROFILE_username'])
-        self.assertEqual(len(response.context['paginator'].object_list), 1)
-        self.assertContains(response, self.post.text)
-        self.assertEqual(response.context['author'].username, self.user.username)
+        self.assertContains(response, 'test_text')
+        self.assertContains(response, self.group.id)
+        self.check(self.current_urls['GROUP_POSTS_original'], 'group', self.group.title)
+        # один - из SetUp, второй - из этого теста
+        self.assertEqual(len(response.context['paginator'].object_list), 2)
+        self.assertIn('test_text', str(response.context['paginator'].object_list))
 
 
     def test_post_NotAutorized(self):
@@ -92,13 +88,16 @@ class ScriptsTest(TestCase):
                             f'{reverse("new_post")}'
                             )
                         )
+        response = self.not_login_user.get(self.current_urls['INDEX'])
+        # только один из SetUp
         self.assertEqual(len(response.context['paginator'].object_list), 1)
                         
                        
     def test_post_on_pages(self):
-        self.check_method(self.current_urls['INDEX'], self.post.text)
-        self.check_method(self.current_urls['POST'], self.post.text)
-        self.check_method(self.current_urls['PROFILE_username'], self.post.text)
+        response = self.login_user.post(self.current_urls['INDEX'])
+        self.assertIn(self.post.text, str(response.context['paginator'].object_list))
+        self.check(self.current_urls['POST'], 'post', self.post.text)
+        self.check(self.current_urls['PROFILE_username'], 'post', self.post.text)
 
     
     def test_edit_post(self):
@@ -112,28 +111,14 @@ class ScriptsTest(TestCase):
                             new_data,
                             follow=True
                             )
+        self.assertEqual(response.status_code, 200)
         self.assertEqual(str(response.context['post']), new_data['text'])
         self.assertContains(response, new_data['group'], status_code=200)
 
-        self.check_method_NOT(self.current_urls['GROUP_POSTS_original'], new_data['text'])
-
-        self.check_method_NOT(self.current_urls['GROUP_POSTS_test_edit'], self.post.text)
-        self.check_method_NOT(self.current_urls['GROUP_POSTS_test_edit'], self.group)
-        
-        self.check_method(self.current_urls['GROUP_POSTS_test_edit'], new_data["text"])
         self.check(self.current_urls['GROUP_POSTS_test_edit'], 'group', self.group_new.title)
 
         self.check(self.current_urls['PROFILE_username'], 'post', new_data["text"])
-        self.check_method(self.current_urls['PROFILE_username'], new_data["group"])
-
         self.check(self.current_urls['POST'], 'post', new_data["text"])
-        self.check_method(self.current_urls['POST'], new_data["group"])
 
-        self.check_method(self.current_urls['INDEX'], new_data["text"])
-        self.check_method(self.current_urls['INDEX'], new_data["group"])
-
-        #response=self.login_user.get(self.current_urls['INDEX'])
-        #print(response.context.keys())
-
-        #def check(self, url, wonder_attr, search):
-        #self.response = self.login_user.get(url)  
+        response=self.login_user.get(self.current_urls['INDEX'])
+        self.assertIn(new_data['text'], str(response.context['paginator'].object_list))
