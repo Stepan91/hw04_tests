@@ -2,32 +2,24 @@
 {% block title %}Страница пользователя{% endblock %}
 {% block header %}Страница пользователя{% endblock %}
 {% block content %}
-
 <main role="main" class="container">
     <div class="row">
         <div class="col-md-3 mb-3 mt-1">
             <div class="card">
-                {% include "author.html" with first_name=author.first_name last_name=author.last_name username=author.username count=author.posts.count %}
+                {% include "author.html" with author=author %}
             </div>
         </div>
-<!-- Здесь не получилось. Никак. Сокурсники не в курсе. Есть подсазки? -->
             <div class="col-md-9">                
-                <!-- Начало блока с отдельным постом -->
                 {% for post in page %}
-                {% include "single_post.html" with Flag=True %}
-        <!-- Конец блока с отдельным постом -->
-        {% endfor %}
-        <!-- Остальные посты -->
+                {% include "single_post.html" with flag=True %}
+                {% endfor %}
         <p>
             {{ post.text|linebreaksbr }}
         </p>
-
-        <!-- Здесь постраничная навигация паджинатора -->
         {% if page.has_other_pages %}
             {% include "paginator.html" with items=page paginator=paginator %}
         {% endif %}
         </div>
     </div>
 </main> 
-
 {% endblock %}

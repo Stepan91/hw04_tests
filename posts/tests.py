@@ -16,48 +16,24 @@ class ScriptsTest(TestCase):
                         password='12345'
                         )
         self.group = Group.objects.create(title='original_group', slug='original')
-        # перенес пост из локальных тестов сюда,
-        # чтобы устранить замечания о создании структуры данных с урлами
-        self.post = Post.objects.create(text='GOGOGOGOGO', author=self.user, group=self.group)
         self.not_login_user = Client()
         self.login_user = Client()
         self.login_user.force_login(self.user)
-        self.current_urls={
-            'POST_EDIT': reverse(
-                            'post_edit', 
-                            kwargs={'username': self.user.username, 'post_id': self.post.id}
-                            ),
-            'GROUP_POSTS_test_edit': reverse(
-                                        'group_posts', 
-                                        kwargs={'slug': 'test_edit'}
-                                        ),
-            'GROUP_POSTS_original': reverse(
-                                        'group_posts', 
-                                        kwargs={'slug': 'original'}
-                                        ),
-            'PROFILE_username': reverse(
-                                    'profile', 
-                                    kwargs={'username': self.user.username}
-                                    ),
-            'PROFILE_text': reverse(
-                                    'profile', 
-                                    kwargs={'username': self.post.text}
-                                    ),
-            'POST': reverse(
-                            'post', 
-                            kwargs={'username': self.user.username, 'post_id': self.post.id}
-                            ),
-            'INDEX': reverse('index'),
-            }
 
   
-    def check(self, url, wonder_attr, search):
-        self.response = self.login_user.get(url)
-        self.assertEqual(str(self.response.context[wonder_attr]), search)
+    def check(self, url, text, author, group):
+        response = self.login_user.get(url)
+        self.assertEqual(str(response.context['post']), text)
+        self.assertEqual(str(response.context['author']), author)
+        self.assertContains(response, group)
 
 
     def test_profile(self):
-        response = self.login_user.get(self.current_urls['PROFILE_username'])
+        url=reverse(
+                    'profile', 
+                    kwargs={'username': self.user.username}
+                    )
+        response = self.login_user.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertIsInstance(response.context['author'], User)
         self.assertEqual(response.context['author'].username, self.user.username)
@@ -69,45 +45,55 @@ class ScriptsTest(TestCase):
                                    {'text': 'test_text', 'group': self.group.id},
                                    follow=True
                                    )
-        
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.user.username)
         self.assertContains(response, 'test_text')
         self.assertContains(response, self.group.id)
-        self.check(self.current_urls['GROUP_POSTS_original'], 'group', self.group.title)
-        # один - из SetUp, второй - из этого теста
-        self.assertEqual(len(response.context['paginator'].object_list), 2)
-        self.assertIn('test_text', str(response.context['paginator'].object_list))
 
 
     def test_post_NotAutorized(self):
-        response = self.not_login_user.post(reverse('new_post'))
+        urls = [reverse("new_post"), reverse("index"), reverse("login")]
+        response = self.not_login_user.post(reverse("new_post"))
         self.assertEqual(response.status_code, 302)
         self.assertRedirects(response, (
-                            f'{reverse("login")}?next='
-                            f'{reverse("new_post")}'
+                            f'{urls[2]}?next='
+                            f'{urls[0]}'
                             )
                         )
-        response = self.not_login_user.get(self.current_urls['INDEX'])
-        # только один из SetUp
-        self.assertEqual(len(response.context['paginator'].object_list), 1)
+        response = self.not_login_user.get(urls[1])
+        self.assertEqual(len(response.context['paginator'].object_list), 0)
                         
                        
     def test_post_on_pages(self):
-        response = self.login_user.post(self.current_urls['INDEX'])
-        self.assertIn(self.post.text, str(response.context['paginator'].object_list))
-        self.check(self.current_urls['POST'], 'post', self.post.text)
-        self.check(self.current_urls['PROFILE_username'], 'post', self.post.text)
+        post = Post.objects.create(text='GOGOGOGOGO', author=self.user, group=self.group)
+        urls = [
+            reverse("index"),
+            reverse("post", kwargs={"username": self.user.username, "post_id": post.id}),
+            reverse("profile", kwargs={"username": self.user.username})
+        ]
+        response = self.login_user.post(urls[0])
+        self.assertIn(post.text, str(response.context['paginator'].object_list))
+        self.check(urls[1], post.text, self.user.username, self.group.id)
+        self.check(urls[2], post.text, self.user.username, self.group.id)
 
-    
+
     def test_edit_post(self):
-        self.group_new = Group.objects.create(title='test_group_after_edit', slug='test_edit')
+        post = Post.objects.create(text='GOGOGOGOGO', author=self.user, group=self.group)
+        group_new = Group.objects.create(title='test_group_after_edit', slug='test_edit')
+        urls = [
+            reverse("post_edit", kwargs={"username": self.user.username, "post_id": post.id}),
+            reverse("group_posts", kwargs={"slug": "test_edit"}),
+            reverse("profile", kwargs={"username": self.user.username}),
+            reverse("post", kwargs={"username": self.user.username, "post_id": post.id}),
+            reverse("index"),
+            reverse("group_posts", kwargs={"slug": "original"})
+        ]
         new_data = {
             'text': 'new_text_after_edit',
-            'group': self.group_new.id,
+            'group': group_new.id,
             }
         response = self.login_user.post(
-                            self.current_urls['POST_EDIT'],
+                            urls[0],
                             new_data,
                             follow=True
                             )
@@ -115,10 +101,23 @@ class ScriptsTest(TestCase):
         self.assertEqual(str(response.context['post']), new_data['text'])
         self.assertContains(response, new_data['group'], status_code=200)
 
-        self.check(self.current_urls['GROUP_POSTS_test_edit'], 'group', self.group_new.title)
-
-        self.check(self.current_urls['PROFILE_username'], 'post', new_data["text"])
-        self.check(self.current_urls['POST'], 'post', new_data["text"])
-
-        response=self.login_user.get(self.current_urls['INDEX'])
+        response = self.login_user.post(urls[1])
         self.assertIn(new_data['text'], str(response.context['paginator'].object_list))
+        self.assertEqual(group_new.title, str(response.context['group']))
+
+        response = self.login_user.post(urls[2])
+        self.assertIn(new_data['text'], str(response.context['paginator'].object_list))
+        self.assertEqual(self.user.username, str(response.context['author']))
+
+        response = self.login_user.post(urls[3])
+        self.assertIn(new_data['text'], str(response.context['post']))
+        self.assertEqual(self.user.username, str(response.context['author']))
+
+        response=self.login_user.get(urls[4])
+        print(response.context)
+        self.assertIn(new_data['text'], str(response.context['paginator'].object_list))
+        self.assertEqual(self.user.username, str(response.context['user']))
+
+        response = self.login_user.post(urls[5])
+        self.assertNotIn(new_data['text'], str(response.context['paginator'].object_list))
+        self.assertNotEqual(group_new.title, str(response.context['group']))
