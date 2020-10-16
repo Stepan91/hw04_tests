@@ -23,9 +23,15 @@ class ScriptsTest(TestCase):
   
     def check(self, url, text, author, group):
         response = self.login_user.get(url)
-        self.assertEqual(str(response.context['post']), text)
-        self.assertEqual(str(response.context['author']), author)
-        self.assertContains(response, group)
+        paginator = response.context.get('paginator')
+        if paginator is not None:
+            self.assertEqual(response.context['paginator'].count, 1)
+            post_on_page = response.context['page'][0]
+        else:
+            post_on_page = response.context['post']
+        self.assertEqual(post_on_page.text, text)
+        self.assertEqual(str(post_on_page.author), author)
+        self.assertEqual(str(post_on_page.group), str(group))
 
 
     def test_profile(self):
@@ -40,28 +46,24 @@ class ScriptsTest(TestCase):
     
 
     def test_post_autorized(self):
-        response = self.login_user.post(
-                                   reverse('new_post'),
-                                   {'text': 'test_text', 'group': self.group.id},
-                                   follow=True
-                                   )
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, self.user.username)
-        self.assertContains(response, 'test_text')
-        self.assertContains(response, self.group.id)
+        post = self.login_user.post( 
+                                reverse('new_post'), 
+                                {'text': 'test_text', 'group': self.group.id}, 
+                                follow=True 
+                                )
+        self.check(reverse('index'), 'test_text', self.user.username, self.group)
 
 
     def test_post_NotAutorized(self):
         urls = [reverse("new_post"), reverse("index"), reverse("login")]
-        response = self.not_login_user.post(reverse("new_post"))
-        self.assertEqual(response.status_code, 302)
-        self.assertRedirects(response, (
+        try_post = self.not_login_user.post(reverse("new_post"))
+        self.assertEqual(try_post.status_code, 302)
+        self.assertRedirects(try_post, (
                             f'{urls[2]}?next='
                             f'{urls[0]}'
                             )
                         )
-        response = self.not_login_user.get(urls[1])
-        self.assertEqual(len(response.context['paginator'].object_list), 0)
+        self.assertTrue(try_post.context == None)
                         
                        
     def test_post_on_pages(self):
@@ -71,17 +73,14 @@ class ScriptsTest(TestCase):
             reverse("post", kwargs={"username": self.user.username, "post_id": post.id}),
             reverse("profile", kwargs={"username": self.user.username})
         ]
-        response = self.login_user.post(urls[0])
-        self.assertIn(post.text, str(response.context['paginator'].object_list))
-        self.check(urls[1], post.text, self.user.username, self.group.id)
-        self.check(urls[2], post.text, self.user.username, self.group.id)
+        for i in urls:
+            self.check(i, post.text, self.user.username, self.group)
 
 
     def test_edit_post(self):
         post = Post.objects.create(text='GOGOGOGOGO', author=self.user, group=self.group)
         group_new = Group.objects.create(title='test_group_after_edit', slug='test_edit')
         urls = [
-            reverse("post_edit", kwargs={"username": self.user.username, "post_id": post.id}),
             reverse("group_posts", kwargs={"slug": "test_edit"}),
             reverse("profile", kwargs={"username": self.user.username}),
             reverse("post", kwargs={"username": self.user.username, "post_id": post.id}),
@@ -92,8 +91,12 @@ class ScriptsTest(TestCase):
             'text': 'new_text_after_edit',
             'group': group_new.id,
             }
-        response = self.login_user.post(
-                            urls[0],
+        response = self.login_user.post(reverse('post_edit', 
+                            kwargs={
+                                "username": self.user.username, 
+                                "post_id": post.id
+                                }
+                            ),
                             new_data,
                             follow=True
                             )
@@ -101,23 +104,15 @@ class ScriptsTest(TestCase):
         self.assertEqual(str(response.context['post']), new_data['text'])
         self.assertContains(response, new_data['group'], status_code=200)
 
-        response = self.login_user.post(urls[1])
-        self.assertIn(new_data['text'], str(response.context['paginator'].object_list))
-        self.assertEqual(group_new.title, str(response.context['group']))
+        self.check(urls[0], new_data['text'], self.user.username, group_new)
 
-        response = self.login_user.post(urls[2])
-        self.assertIn(new_data['text'], str(response.context['paginator'].object_list))
-        self.assertEqual(self.user.username, str(response.context['author']))
+        self.check(urls[1], new_data['text'], self.user.username, group_new.title)
 
-        response = self.login_user.post(urls[3])
-        self.assertIn(new_data['text'], str(response.context['post']))
-        self.assertEqual(self.user.username, str(response.context['author']))
+        self.check(urls[2], new_data['text'], self.user.username, group_new.title)
 
-        response=self.login_user.get(urls[4])
-        print(response.context)
-        self.assertIn(new_data['text'], str(response.context['paginator'].object_list))
-        self.assertEqual(self.user.username, str(response.context['user']))
+        self.check(urls[3], new_data['text'], self.user.username, group_new.title)
 
-        response = self.login_user.post(urls[5])
-        self.assertNotIn(new_data['text'], str(response.context['paginator'].object_list))
-        self.assertNotEqual(group_new.title, str(response.context['group']))
+        response = self.login_user.post(urls[4])
+        # почему пагинатор пуст, если мы создали пост 
+        # в старой группе в начале этого теста?
+        self.assertEqual(len(response.context['paginator'].object_list), 0)
