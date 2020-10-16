@@ -30,6 +30,7 @@ class ScriptsTest(TestCase):
         else:
             post_on_page = response.context['post']
         self.assertEqual(post_on_page.text, text)
+        # если не приводить к строке - все тесты рушатся
         self.assertEqual(str(post_on_page.author), author)
         self.assertEqual(str(post_on_page.group), str(group))
 
