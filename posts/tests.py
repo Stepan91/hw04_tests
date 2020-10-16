@@ -30,8 +30,8 @@ class ScriptsTest(TestCase):
         else:
             post_on_page = response.context['post']
         self.assertEqual(post_on_page.text, text)
-        # если не приводить к строке - все тесты рушатся
-        self.assertEqual(str(post_on_page.author), author)
+        # если не приводить к строке - 3 теста рушатся
+        self.assertEqual(post_on_page.author, author)
         self.assertEqual(str(post_on_page.group), str(group))
 
 
@@ -52,19 +52,24 @@ class ScriptsTest(TestCase):
                                 {'text': 'test_text', 'group': self.group.id}, 
                                 follow=True 
                                 )
-        self.check(reverse('index'), 'test_text', self.user.username, self.group)
+        object = Post.objects.get(id=1)
+        all_objects = len(Post.objects.all())
+        self.assertEqual(all_objects, 1)
+        self.assertEqual(object.text, 'test_text')
+        self.assertEqual(object.author, self.user)
+        self.assertEqual(object.group, self.group)
 
 
     def test_post_NotAutorized(self):
-        urls = [reverse("new_post"), reverse("index"), reverse("login")]
         try_post = self.not_login_user.post(reverse("new_post"))
         self.assertEqual(try_post.status_code, 302)
         self.assertRedirects(try_post, (
-                            f'{urls[2]}?next='
-                            f'{urls[0]}'
+                            f'{reverse("login")}?next='
+                            f'{reverse("new_post")}'
                             )
                         )
-        self.assertTrue(try_post.context == None)
+        all_objects = len(Post.objects.all())
+        self.assertEqual(all_objects, 0)
                         
                        
     def test_post_on_pages(self):
@@ -74,8 +79,8 @@ class ScriptsTest(TestCase):
             reverse("post", kwargs={"username": self.user.username, "post_id": post.id}),
             reverse("profile", kwargs={"username": self.user.username})
         ]
-        for i in urls:
-            self.check(i, post.text, self.user.username, self.group)
+        for test in urls:
+            self.check(test, post.text, self.user, self.group)
 
 
     def test_edit_post(self):
@@ -86,7 +91,6 @@ class ScriptsTest(TestCase):
             reverse("profile", kwargs={"username": self.user.username}),
             reverse("post", kwargs={"username": self.user.username, "post_id": post.id}),
             reverse("index"),
-            reverse("group_posts", kwargs={"slug": "original"})
         ]
         new_data = {
             'text': 'new_text_after_edit',
@@ -102,18 +106,15 @@ class ScriptsTest(TestCase):
                             follow=True
                             )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(str(response.context['post']), new_data['text'])
         self.assertContains(response, new_data['group'], status_code=200)
 
-        self.check(urls[0], new_data['text'], self.user.username, group_new)
+        for test in urls:
+            self.check(test, new_data['text'], self.user, group_new.title)
 
-        self.check(urls[1], new_data['text'], self.user.username, group_new.title)
-
-        self.check(urls[2], new_data['text'], self.user.username, group_new.title)
-
-        self.check(urls[3], new_data['text'], self.user.username, group_new.title)
-
-        response = self.login_user.post(urls[4])
-        # почему пагинатор пуст, если мы создали пост 
-        # в старой группе в начале этого теста?
-        self.assertEqual(len(response.context['paginator'].object_list), 0)
+        response = self.login_user.post(reverse(
+                                   "group_posts",
+                                   kwargs={"slug": "original"}
+                                   )
+                                )
+        # точно, спасибо!
+        self.assertEqual(response.context['paginator'].count, 0)
